@@ -3,6 +3,7 @@ import java.io.*;
 public class EK_MaxCost {
     // 基于 EK 和 SPFA 的增广路算法
     // 所有费用设为相反数，找最小费用流，然后将答案转成相反数
+    // 平均时间复杂度 O(VE) = O((m+n)mn) = 1e7
     static BufferedReader sc = new BufferedReader(new InputStreamReader(System.in));
     static PrintWriter out = new PrintWriter(System.out);
     public static void main(String[] args) throws IOException {
