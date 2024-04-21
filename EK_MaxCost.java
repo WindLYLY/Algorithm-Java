@@ -1,7 +1,8 @@
 import java.util.*;
 import java.io.*;
 public class EK_MaxCost {
-    // 基于EK的增广路算法
+    // 基于 EK 和 SPFA 的增广路算法
+    // 所有费用设为相反数，找最小费用流，然后将答案转成相反数
     static BufferedReader sc = new BufferedReader(new InputStreamReader(System.in));
     static PrintWriter out = new PrintWriter(System.out);
     public static void main(String[] args) throws IOException {
@@ -13,89 +14,89 @@ public class EK_MaxCost {
             p[i] = na();
         }
 
-        long[][] g = new long[1][1], c = new long[1][1];
-        int[] ar = build(g, c, a, p, m, n); // {s, t, n}
-        int s = ar[0], t = ar[1];
-        n = ar[2];
-        for (int i = 0; i < m; i++) {
-            in = na();
-            int x = in[0] - 1, y = in[1] - 1, w = in[2], cost = in[3];
-            g[x][y] = w;
-            c[x][y] = cost;
-            c[y][x] = -cost; // 添加反向边
+        // 0源点  nn-1汇点
+        // 1~m 员工
+        // m+1 ~ m+n 区域
+
+        // g为边容量 c为边费用
+        long[][] g, c;
+        { // 建图
+            int nn = m + n + 2;
+            g = new long[nn][nn];
+            c = new long[nn][nn];
+            for (int i = 1; i <= m; i++) {
+                g[0][i] = 1; // 源点到每个员工容量为1的边
+            }
+            for (int i = m + 1; i <= m + n; i++) { // 区域到汇点的边容量 为区域的容量
+                g[i][n - 1] = a[i - m - 1];
+            }
+            for (int i = 1; i <= m; i++) {
+                for (int j = m + 1; j <= m + n; j++) {
+                    g[i][j] = 1; // 每个员工到区域的边容量为1
+                    int cc = p[i - 1][j - m - 1];
+                    c[i][j] = -cc; // 喜爱度为员工到区域的费用  (取相反数 为负权重)
+                    c[j][i] = cc; // 添加负权重 (相反数 为正权重)
+                }
+            }
+
+            n = nn;
         }
-        long maxFlow = 0;
+
         long minCost = 0;
-        while (true) {
-            int[] pre = new int[n]; // 保存路径
-            Arrays.fill(pre, -1);
-
-            long[] dis = new long[n]; // s到i的费用
-            Arrays.fill(dis, Long.MIN_VALUE);
-            dis[s] = 0;
-
-            if (!find(g, c, n, s, t, pre, dis)) break; // 不存在s到t的最短路，结束算法
-
-            long flow = Long.MAX_VALUE; // 当前最短路的流量瓶颈
-            int tmp = t;
-            while (tmp != s) { // 遍历路径寻找流量瓶颈
-                int next = pre[tmp];
-                flow = Math.min(flow, g[next][tmp]);
-                tmp = next;
-            }
-            tmp = t;
-            while (tmp != s) { // 用流量瓶颈更新容量
-                int next = pre[tmp];
-                g[next][tmp] -= flow;
-                g[tmp][next] += flow;
-                tmp = next;
-            }
-            minCost += flow * dis[t]; // 计算最小费用
-            maxFlow += flow; // 计算最大流
+        long cost;
+        while ((cost = f(g, c, n)) <= 0) { // 存在增广路则计算结果
+            minCost += cost;
         }
-        out.println(maxFlow + " " + minCost);
+
+        out.println(-minCost); // 结果取相反数，即为最大费用
         out.flush();
     }
-    static int[] build(long[][] g, long[][] c, int[] a, int[][] p, int m, int n) {
-        int s = 0, t = m + n + 1;
-        int nn = m + n + 2;
-        g = new long[nn][nn];
-        c = new long[nn][nn];
-        for (int i = 0; i < m; i++) {
-            g[s][i + 1] = 1; // 起点到每个员工有一条为1的边
-        }
-        // 员工 1 ~ m  区域 m+1 ~ m+n
-        for (int i = 0; i < n; i++) { // 区域到t的边为区域的容量
-            g[i + m + 1][t] = a[i];
-        }
-        for (int i = 0; i < m; i++) {
-            for (int j = 0; j < n; j++) {
-                g[i + 1][j + m + 1] = 1; // 每个员工到区域的边为1
-                c[i + 1][j + m + 1] = p[i][j]; // 喜爱度为员工到区域的费用，其他边费用为0
-            }
-        }
-        return new int[]{s, t, nn};
-    }
-    static boolean find(long[][] g, long[][] c, int n, int s, int t, int[] pre, long[] dis) { // SPFA可以处理负权
+    static long f(long[][] g, long[][] c, int n) {
         Queue<Integer> q = new LinkedList<>();
         boolean[] vis = new boolean[n];
-        vis[s] = true;
-        q.offer(s);
+        vis[0] = true; // 0为起点
+        q.offer(0);
 
-        while (!q.isEmpty()) {
+        long[] dis = new long[n];
+        Arrays.fill(dis, Long.MAX_VALUE);
+        dis[0] = 0;
+
+        int[] pre = new int[n];
+        Arrays.fill(pre, -1);
+
+        while (!q.isEmpty()) { // SPFA寻找最短路
             int x = q.poll();
             vis[x] = false;
             for (int y = 0; y < n; y++) {
-                if (g[x][y] == 0 || vis[y]) continue; // 无容量 || 在队列中跳过
-                if (dis[x] + c[x][y] <= dis[y]) continue; // 找最大费用，费用较小跳过
-                vis[y] = true;
-                q.offer(y);
-                dis[y] = dis[x] + c[x][y];
-                pre[y] = x;
+                if (g[x][y] > 0 && dis[x] + c[x][y] < dis[y]) { // SPFA
+                    if (!vis[y]) {
+                        q.offer(y);
+                        vis[y] = true;
+                    }
+                    dis[y] = dis[x] + c[x][y];
+                    pre[y] = x;
+                }
             }
         }
+        // n - 1为终点 s到t无通路
+        // 由于最短路费用和一定是非正数，即结果是非正数，返回正数代表无通路
+        if (pre[n - 1] == -1) return 1;
 
-        return vis[t]; // 返回s到t是否为通路
+        int y = n - 1;
+        long flow = Long.MAX_VALUE;
+        while (y != 0) { // 找流量瓶颈
+            int x = pre[y];
+            flow = Math.min(flow, g[x][y]);
+            y = x;
+        }
+        y = n - 1;
+        while (y != 0) { // 更新最短路中正向和反向容量
+            int x = pre[y];
+            g[x][y] -= flow;
+            g[y][x] += flow;
+            y = x;
+        }
+        return flow * dis[n - 1];
     }
     static int ni() throws IOException {
         return Integer.parseInt(sc.readLine());
