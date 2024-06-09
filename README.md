@@ -2,4 +2,4 @@
 Some templates of Java.\
 \
 Author: WindLY\
-Email: 1023570460@qq.com
+Email: windly2024@163.com
